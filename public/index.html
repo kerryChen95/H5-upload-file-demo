@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>QQ查找 H5文件上传 demo</title>
+    <title>H5文件上传 demo</title>
 </head>
 <body>
     <input id="fileInput" type="file">
@@ -15,7 +15,8 @@
     </p>
     <script>
     (function(){
-        var IMAGE_MIME_REG = /image.*/;
+        var IMAGE_MIME_REG = /image.*/,
+            CGI_UPLOAD_FILE = 'http://localhost:3000/userfile';
         var slice = [].slice;
         var fileInput = document.getElementById('fileInput'),
             fileName = document.getElementById('fileName'),
@@ -26,15 +27,15 @@
 
         window.URL = window.URL || window.webkitURL;
         if (!XMLHttpRequest.prototype.sendAsBinary) {
-          XMLHttpRequest.prototype.sendAsBinary = function (sData) {
-            var nBytes = sData.length, ui8Data = new Uint8Array(nBytes);
-            for (var nIdx = 0; nIdx < nBytes; nIdx++) {
-              ui8Data[nIdx] = sData.charCodeAt(nIdx) & 0xff;
-            }
-            /* send as ArrayBufferView...: */
-            this.send(ui8Data);
-            /* ...or as ArrayBuffer (legacy)...: this.send(ui8Data.buffer); */
-          };
+            XMLHttpRequest.prototype.sendAsBinary = function (sData) {
+                var nBytes = sData.length,
+                    ui8Data = new Uint8Array(nBytes);
+                for(var nIdx = 0; nIdx < nBytes; nIdx++) {
+                ui8Data[nIdx] = sData.charCodeAt(nIdx) & 0xff;
+                }
+                // send as ArrayBufferView
+                this.send(ui8Data);
+            };
         }
 
         fileInput.addEventListener('change', function(event){
@@ -63,9 +64,11 @@
                     }
                 }
 
-                reader = readers[i] = new FileReader();
-                reader.addEventListener('loadend', onReaderLoadEnd);
-                reader.readAsBinaryString(file);
+                submitFile(file);
+
+                // reader = readers[i] = new FileReader();
+                // reader.addEventListener('loadend', onReaderLoadEnd);
+                // reader.readAsBinaryString(file);
             }
 
             // 当读取结束的时候触发 `loadend` 事件，不管读取成功还是失败
@@ -96,14 +99,30 @@
             var xhr;
 
             xhr = new XMLHttpRequest();
-            xhr.open('POST', '/file');
-            xhr.overrideMimeType('text/plain; charset=x-user-defined-binary');
+            xhr.open('POST', CGI_UPLOAD_FILE);
+            // xhr.overrideMimeType('text/plain; charset=x-user-defined-binary');
             xhr.upload.addEventListener('load', onUploadFileLoad, false);
             xhr.sendAsBinary(fileData);
         }
 
         function onUploadFileLoad(event){
             console.log('Uploading file complete!');
+        }
+
+        function submitFile(file){
+            var xhr, formData;
+
+            xhr = new XMLHttpRequest();
+            formData = new FormData();
+            xhr.open('POST', CGI_UPLOAD_FILE);
+            formData.append('file', file);
+            xhr.onload = onSubmitFileLoad;
+            xhr.send(formData);
+        }
+
+        function onSubmitFileLoad(event){
+            var xhr = event.target;
+            console.log('Respone: %s', xhr.responseText);
         }
     })();
     </script>
