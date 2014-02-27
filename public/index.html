@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>QQ查找 H5文件上传 demo</title>
+</head>
+<body>
+    <input id="fileInput" type="file">
+    <p>
+        文件名：<span id="fileName"></span><br>
+        MIME类型：<span id="fileMime"></span><br>
+        文件大小：<span id="fileSize"></span><br>
+        最近修改时间：<span id="fileLastModifiedDate"></span><br>
+        <img id="filePreview">
+    </p>
+    <script>
+    (function(){
+        var IMAGE_MIME_REG = /image.*/;
+        var slice = [].slice;
+        var fileInput = document.getElementById('fileInput'),
+            fileName = document.getElementById('fileName'),
+            fileMime = document.getElementById('fileMime'),
+            fileSize = document.getElementById('fileSize'),
+            fileLastModifiedDate = document.getElementById('fileLastModifiedDate'),
+            filePreview = document.getElementById('filePreview');
+
+        window.URL = window.URL || window.webkitURL;
+        if (!XMLHttpRequest.prototype.sendAsBinary) {
+          XMLHttpRequest.prototype.sendAsBinary = function (sData) {
+            var nBytes = sData.length, ui8Data = new Uint8Array(nBytes);
+            for (var nIdx = 0; nIdx < nBytes; nIdx++) {
+              ui8Data[nIdx] = sData.charCodeAt(nIdx) & 0xff;
+            }
+            /* send as ArrayBufferView...: */
+            this.send(ui8Data);
+            /* ...or as ArrayBuffer (legacy)...: this.send(ui8Data.buffer); */
+          };
+        }
+
+        fileInput.addEventListener('change', function(event){
+            var files = slice.call(event.target.files) || [],
+                readers = [],
+                i, file, reader, img;
+
+            for(var i = 0; i < files.length; ++i){
+                file = files[i];
+                
+                // TODO: 目前只显示第一个文件的信息，后续支持显示所有文件的信息
+                if(i === 0){
+                    fileName.innerText = file.name;
+                    fileMime.innerText = file.type;
+                    fileSize.innerText = file.size;
+                    fileLastModifiedDate.innerText = 
+                        file.lastModifiedDate ?
+                        file.lastModifiedDate.toLocaleDateString() :
+                        'Not Available';
+                    // 如果是图片，显示其预览图
+                    if( file.type.match(IMAGE_MIME_REG) ){
+                        // 使用object URL来展示预览图
+                        filePreview.src = window.URL.createObjectURL(file);
+                        filePreview.height = 100;
+                        filePreview.onload = onFilePreviewLoad;
+                    }
+                }
+
+                reader = readers[i] = new FileReader();
+                reader.addEventListener('loadend', onReaderLoadEnd);
+                reader.readAsBinaryString(file);
+            }
+
+            // 当读取结束的时候触发 `loadend` 事件，不管读取成功还是失败
+            // TODO: 考虑怎么判断读取是否成功
+            function onReaderLoadEnd(event){
+                var reader, index, fileData;
+
+                reader = event.target;
+                index = readers.indexOf(reader);
+
+                if( reader.readyState === FileReader.DONE &&
+                    (fileData = reader.result)
+                ){
+                    uploadFile(fileData);
+                }
+
+                // 删除引用，以免内存泄漏
+                readers.splice(index, 1);
+                files.splice(index, 1);
+            }
+        });
+
+        function onFilePreviewLoad(event){
+            window.URL.revokeObjectURL(this.src);
+        }
+
+        function uploadFile(fileData){
+            var xhr;
+
+            xhr = new XMLHttpRequest();
+            xhr.open('POST', '/file');
+            xhr.overrideMimeType('text/plain; charset=x-user-defined-binary');
+            xhr.upload.addEventListener('load', onUploadFileLoad, false);
+            xhr.sendAsBinary(fileData);
+        }
+
+        function onUploadFileLoad(event){
+            console.log('Uploading file complete!');
+        }
+    })();
+    </script>
+</body>
+</html>
